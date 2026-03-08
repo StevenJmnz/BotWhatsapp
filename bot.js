@@ -34,9 +34,7 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     const GRUPOS_ACTIVOS = answer.split(',').map(g => g.trim());
     console.log('Grupos activos:', GRUPOS_ACTIVOS.join(', '));
 
-    // ----------------------
-    // CONFIG BOT
-    // ----------------------
+    // ---------------------- CONFIG BOT ----------------------
     const client = new Client({
         authStrategy: new LocalAuth(),
         puppeteer: {
@@ -62,17 +60,23 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     let sexoPorUsuario = {};
     let esperandoSexo = {};
 
-    // ----------------------
-    // FUNCIONES AUX
-    // ----------------------
+    // ---------------------- GLOBAL BOT STATE ----------------------
+    global.botState = {
+        grupos: {},
+        confirmados: {},
+        reemplazos: {},
+        sexo: {}
+    };
+
+    // ---------------------- FUNCIONES AUX ----------------------
     async function safeSend(chat, text){
         try { await chat.sendMessage(text); } 
         catch (err) { console.log("Error enviando mensaje:", err.message); }
     }
 
     function faltantes(grupoID){
-        const hombresFaltan = Math.max(0, HOMBRES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="H").length);
-        const mujeresFaltan = Math.max(0, MUJERES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="M").length);
+        const hombresFaltan = Math.max(0, HOMBRES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]||{}).filter(s => s==="H").length);
+        const mujeresFaltan = Math.max(0, MUJERES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]||{}).filter(s => s==="M").length);
         return {hombres: hombresFaltan, mujeres: mujeresFaltan};
     }
 
@@ -80,8 +84,8 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         let listaConfirmadosH = "";
         let listaConfirmadosM = "";
 
-        Object.entries(sexoPorUsuario[grupoID]).forEach(([tel, sexo], i)=>{
-            const nombre = miembrosPorGrupo[grupoID][tel];
+        Object.entries(sexoPorUsuario[grupoID]||{}).forEach(([tel, sexo], i)=>{
+            const nombre = miembrosPorGrupo[grupoID][tel] || "Desconocido";
             if(sexo==="H") listaConfirmadosH += `${listaConfirmadosH.split("\n").length}. ${nombre}\n`;
             if(sexo==="M") listaConfirmadosM += `${listaConfirmadosM.split("\n").length}. ${nombre}\n`;
         });
@@ -92,8 +96,8 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
 
 Fecha: ${fecha}
 
-Confirmados: ${confirmadosPorGrupo[grupoID].length}
-Reemplazos: ${reemplazosPorGrupo[grupoID].length}
+Confirmados: ${confirmadosPorGrupo[grupoID]?.length||0}
+Reemplazos: ${reemplazosPorGrupo[grupoID]?.length||0}
 Faltantes: Hombres: ${faltan.hombres}, Mujeres: ${faltan.mujeres}
 
 👨 HOMBRES
@@ -115,13 +119,13 @@ ${listaConfirmadosM || "Nadie aún"}
         const sheet = workbook.addWorksheet("Asistencia");
         sheet.addRow(["Nombre","Estado","Sexo","Fecha"]);
 
-        confirmadosPorGrupo[grupoID].forEach(telefono=>{
+        (confirmadosPorGrupo[grupoID]||[]).forEach(telefono=>{
             const nombre = miembrosPorGrupo[grupoID][telefono];
             const sexo = sexoPorUsuario[grupoID][telefono]==="H"?"Hombre":"Mujer";
             sheet.addRow([nombre,"Confirmado",sexo,fecha]);
         });
 
-        reemplazosPorGrupo[grupoID].forEach(telefono=>{
+        (reemplazosPorGrupo[grupoID]||[]).forEach(telefono=>{
             const nombre = miembrosPorGrupo[grupoID][telefono] || "Desconocido";
             sheet.addRow([nombre,"Reemplazo","-",fecha]);
         });
@@ -130,10 +134,9 @@ ${listaConfirmadosM || "Nadie aún"}
         catch(err){ console.log("Error guardando Excel:", err.message); }
     }
 
-    // ----------------------
-    // EVENTOS DEL BOT
-    // ----------------------
+    // ---------------------- EVENTOS BOT ----------------------
     client.on('qr', qr => qrcode.generate(qr,{small:true}));
+
     client.on('ready', async ()=>{
         console.log("Bot listo");
 
@@ -157,6 +160,12 @@ ${listaConfirmadosM || "Nadie aún"}
 
             console.log(`Grupo activo cargado: ${grupo.name}`);
         }
+
+        // Actualizamos el estado global
+        global.botState.grupos = miembrosPorGrupo;
+        global.botState.confirmados = confirmadosPorGrupo;
+        global.botState.reemplazos = reemplazosPorGrupo;
+        global.botState.sexo = sexoPorUsuario;
     });
 
     client.on('message', async message=>{
@@ -169,11 +178,11 @@ ${listaConfirmadosM || "Nadie aún"}
             const grupoID = chat.id._serialized;
             const texto = (message.body||"").toLowerCase().trim();
             const personaID = message.author || message.from;
-            const personaNombre = message._data.notifyName || "Usuario";
+            const personaNombre = message._data?.notifyName || "Usuario";
 
             miembrosPorGrupo[grupoID][personaID] = personaNombre;
 
-            // ---------------- SEXO
+            // ----------- SEXO -----------
             if(esperandoSexo[grupoID][personaID]){
                 if(texto==="1"||texto==="2"){
                     const sexo = texto==="1"?"H":"M";
@@ -192,7 +201,14 @@ ${listaConfirmadosM || "Nadie aún"}
                     sexoPorUsuario[grupoID][personaID]=sexo;
                     if(!confirmadosPorGrupo[grupoID].includes(personaID))
                         confirmadosPorGrupo[grupoID].push(personaID);
+
                     await safeSend(chat,`✅ Confirmación registrada: ${personaNombre} (${sexo==="H"?"Hombre":"Mujer"})`);
+
+                    // Actualizamos estado global
+                    global.botState.grupos = miembrosPorGrupo;
+                    global.botState.confirmados = confirmadosPorGrupo;
+                    global.botState.reemplazos = reemplazosPorGrupo;
+                    global.botState.sexo = sexoPorUsuario;
 
                     esperandoSexo[grupoID][personaID]=false;
                     generarExcel(grupoID, chat.name);
@@ -200,30 +216,35 @@ ${listaConfirmadosM || "Nadie aún"}
                 } else { await safeSend(chat,"Por favor responde solo:\n1️⃣ Hombre\n2️⃣ Mujer"); return; }
             }
 
-            // ---------------- CONFIRMACION
+            // ----------- CONFIRMACION -----------
             if(PALABRAS_CONFIRMACION.some(p=>texto.includes(p))){
                 await safeSend(chat,"Para completar tu confirmación responde con:\n1️⃣ Hombre\n2️⃣ Mujer");
                 esperandoSexo[grupoID][personaID]=true; return;
             }
 
-            // ---------------- REEMPLAZO
+            // ----------- REEMPLAZO -----------
             if(PALABRAS_REEMPLAZO.some(p=>texto.includes(p))){
                 if(!reemplazosPorGrupo[grupoID].includes(personaID)){
                     reemplazosPorGrupo[grupoID].push(personaID);
                     await safeSend(chat,"🟡 Reemplazo registrado: " + personaNombre);
+
+                    // Actualizamos estado global
+                    global.botState.grupos = miembrosPorGrupo;
+                    global.botState.confirmados = confirmadosPorGrupo;
+                    global.botState.reemplazos = reemplazosPorGrupo;
+                    global.botState.sexo = sexoPorUsuario;
+
                     generarExcel(grupoID, chat.name);
                 } return;
             }
 
-            // ---------------- REPORTE
+            // ----------- REPORTE -----------
             if(texto==="reporte") enviarReporte(chat, grupoID);
 
         } catch(err){ console.log("ERROR MENSAJE:",err.message); }
     });
 
-    // ----------------------
-    // CRON REPORTE
-    // ----------------------
+    // ---------------------- CRON REPORTE ----------------------
     cron.schedule('0 * * * *', async ()=>{
         const chats = await client.getChats();
         for(const chat of chats){
@@ -234,34 +255,21 @@ ${listaConfirmadosM || "Nadie aún"}
         }
     });
 
-    // ----------------------
-    // DASHBOARD WEB
-    // ----------------------
+    // ---------------------- DASHBOARD WEB ----------------------
     const app = express();
     const PORT = 3000;
 
-    app.get('/', (req,res)=>{
-        let html = `<h1>Dashboard Bot WhatsApp</h1>`;
-        for(const grupoID in miembrosPorGrupo){
-            html += `<h2>${grupoID} (${confirmadosPorGrupo[grupoID].length} confirmados)</h2>`;
-            html += `<ul>`;
-            for(const tel in miembrosPorGrupo[grupoID]){
-                const nombre = miembrosPorGrupo[grupoID][tel];
-                const sexo = sexoPorUsuario[grupoID][tel]||"-";
-                html += `<li>${nombre} | ${sexo} | ${confirmadosPorGrupo[grupoID].includes(tel)?"✅":"❌"}</li>`;
-            }
-            html += `</ul>`;
-        }
-        res.send(html);
+    app.use(express.static('public'));
+
+    app.get('/api/status', (req,res)=>{
+        res.json(global.botState);
     });
 
     app.listen(PORT, '0.0.0.0', ()=>{
         console.log(`Dashboard web accesible en: http://136.116.81.204:${PORT}`);
     });
 
-    // ----------------------
-    // INICIALIZAR BOT
-    // ----------------------
+    // ---------------------- INICIALIZAR BOT ----------------------
     client.initialize();
     rl.close();
 });
