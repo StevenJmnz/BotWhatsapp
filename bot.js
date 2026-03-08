@@ -2,16 +2,38 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
+// ----------------------
+// BORRAR SESIÓN ANTERIOR
+// ----------------------
+try {
+    // Borra cache de Puppeteer
+    execSync('rm -rf ~/.cache/puppeteer');
+    // Borra sesión de WhatsApp
+    const sessionPath = path.join(__dirname, '.wwebjs_auth');
+    if (fs.existsSync(sessionPath)) {
+        execSync(`rm -rf ${sessionPath}`);
+    }
+    console.log('Sesión y cache anteriores borradas ✅. Se pedirá QR nuevamente.');
+} catch (err) {
+    console.error('No se pudo borrar la sesión/cache:', err.message);
+}
+
+// ----------------------
+// CONFIG BOT
+// ----------------------
 const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    headless: true,
-    executablePath: '/usr/bin/chromium-browser', // Chromium del sistema
-    args: ['--no-sandbox','--disable-setuid-sandbox'],
-    defaultViewport: null,
-    timeout: 0 // espera indefinida para que cargue WhatsApp Web
-  }
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        executablePath: '/usr/bin/chromium-browser', // Linux
+        args: ['--no-sandbox','--disable-setuid-sandbox'],
+        defaultViewport: null,
+        timeout: 0
+    }
 });
 
 const NECESARIOS = 100;
@@ -30,6 +52,9 @@ let reemplazosPorGrupo = {};
 let sexoPorUsuario = {};       // { grupoID: { telefono: 'H'/'M' } }
 let esperandoSexo = {};        // { grupoID: { telefono: true } }
 
+// ----------------------
+// EVENTOS DEL BOT
+// ----------------------
 client.on('qr', qr => qrcode.generate(qr, {small:true}));
 
 client.on('ready', async () => {
@@ -58,7 +83,6 @@ client.on('ready', async () => {
 });
 
 client.on('message', async message => {
-
     if(!message.from.includes("@g.us")) return;
     const chat = await message.getChat();
     if(!chat.isGroup) return;
@@ -122,6 +146,9 @@ client.on('message', async message => {
     if(texto === "reporte") enviarReporte(message, grupoID);
 });
 
+// ----------------------
+// FUNCIONES
+// ----------------------
 function faltantes(grupoID){
     const hombresFaltan = Math.max(0, HOMBRES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="H").length);
     const mujeresFaltan = Math.max(0, MUJERES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="M").length);
@@ -177,7 +204,10 @@ async function generarExcel(grupoID,nombreGrupo){
     await workbook.xlsx.writeFile(`asistencia_${nombreGrupo}_${fecha}.xlsx`);
 }
 
-// Reporte automático cada 2 minutos                    
+// ----------------------
+// CRON JOBS
+// ----------------------
+// Reporte automático cada hora
 cron.schedule('0 * * * *', async () => { 
     const chats = await client.getChats();
     for(const chat of chats){
@@ -207,4 +237,7 @@ cron.schedule('0 * * * *', async () => {
     }
 });
 
+// ----------------------
+// INICIALIZAR BOT
+// ----------------------
 client.initialize();

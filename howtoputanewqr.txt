@@ -1,0 +1,2 @@
+rm -rf ~/.cache/puppeteer
+rm -rf .wwebjs_auth/
