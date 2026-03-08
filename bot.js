@@ -4,7 +4,11 @@ const cron = require('node-cron');
 const ExcelJS = require('exceljs');
 
 const client = new Client({
-    authStrategy: new LocalAuth()
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    args: ['--no-sandbox','--disable-setuid-sandbox']
+  }
 });
 
 const NECESARIOS = 100;
