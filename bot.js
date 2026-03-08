@@ -3,23 +3,6 @@ const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
 const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-// ----------------------
-// BORRAR SESIÓN ANTERIOR
-// ----------------------
-try {
-    // Borra cache de Puppeteer
-    execSync('rm -rf ~/.cache/puppeteer');
-    // Borra sesión de WhatsApp
-    const sessionPath = path.join(__dirname, '.wwebjs_auth');
-    if (fs.existsSync(sessionPath)) execSync(`rm -rf ${sessionPath}`);
-    console.log('Sesión y cache anteriores borradas ✅. Se pedirá QR nuevamente.');
-} catch (err) {
-    console.error('No se pudo borrar la sesión/cache:', err.message);
-}
 
 // ----------------------
 // ENTRADA DE USUARIO: GRUPOS ACTIVOS
@@ -40,13 +23,8 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         authStrategy: new LocalAuth(),
         puppeteer: {
             headless: true,
-            executablePath: '/usr/bin/chromium-browser',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-background-timer-throttling',
-                '--disable-renderer-backgrounding'
-            ],
+            executablePath: '/usr/bin/chromium-browser', // Linux
+            args: ['--no-sandbox','--disable-setuid-sandbox'],
             defaultViewport: null,
             timeout: 0
         }
@@ -67,14 +45,30 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     let esperandoSexo = {};
 
     // ----------------------
+    // FUNCION SEGURA PARA ENVIAR MENSAJES
+    // ----------------------
+    async function safeSendMessage(chat, texto){
+        if(!chat) return;
+        try {
+            await chat.sendMessage(texto);
+        } catch(err){
+            console.error("No se pudo enviar el mensaje, reintentando...", err.message);
+            await new Promise(r => setTimeout(r, 1000));
+            try {
+                await chat.sendMessage(texto);
+            } catch(e){
+                console.error("Segundo intento falló:", e.message);
+            }
+        }
+    }
+
+    // ----------------------
     // EVENTOS DEL BOT
     // ----------------------
     client.on('qr', qr => qrcode.generate(qr, {small:true}));
 
     client.on('ready', async () => {
-        console.log("Bot listo, cargando chats...");
-        // ⏳ Espera a que WhatsApp Web cargue todos los chats
-        await new Promise(r => setTimeout(r, 8000));
+        console.log("Bot listo");
 
         const chats = await client.getChats();
         const grupos = chats.filter(chat => chat.isGroup && GRUPOS_ACTIVOS.includes(chat.name));
@@ -82,12 +76,11 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         for(const grupo of grupos){
             const grupoID = grupo.id._serialized;
 
-            // Inicializa estructuras si no existen
-            miembrosPorGrupo[grupoID] = miembrosPorGrupo[grupoID] || {};
-            confirmadosPorGrupo[grupoID] = confirmadosPorGrupo[grupoID] || [];
-            reemplazosPorGrupo[grupoID] = reemplazosPorGrupo[grupoID] || [];
-            sexoPorUsuario[grupoID] = sexoPorUsuario[grupoID] || {};
-            esperandoSexo[grupoID] = esperandoSexo[grupoID] || {};
+            miembrosPorGrupo[grupoID] = {};
+            confirmadosPorGrupo[grupoID] = [];
+            reemplazosPorGrupo[grupoID] = [];
+            sexoPorUsuario[grupoID] = {};
+            esperandoSexo[grupoID] = {};
 
             grupo.participants.forEach(p => {
                 const telefono = p.id._serialized;
@@ -99,9 +92,6 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         }
     });
 
-    // ----------------------
-    // MENSAJES
-    // ----------------------
     client.on('message', async message => {
         if(!message.from.includes("@g.us")) return;
         const chat = await message.getChat();
@@ -113,13 +103,6 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         const personaID = message.author;
         const personaNombre = message._data.notifyName || "Usuario";
 
-        // Inicializa estructuras si no existen
-        miembrosPorGrupo[grupoID] = miembrosPorGrupo[grupoID] || {};
-        confirmadosPorGrupo[grupoID] = confirmadosPorGrupo[grupoID] || [];
-        reemplazosPorGrupo[grupoID] = reemplazosPorGrupo[grupoID] || [];
-        sexoPorUsuario[grupoID] = sexoPorUsuario[grupoID] || {};
-        esperandoSexo[grupoID] = esperandoSexo[grupoID] || {};
-
         miembrosPorGrupo[grupoID][personaID] = personaNombre;
 
         if(esperandoSexo[grupoID][personaID]){
@@ -130,29 +113,29 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
                 const mujeresActual = Object.values(sexoPorUsuario[grupoID]).filter(s => s==="M").length;
 
                 if(sexo === "H" && hombresActual >= HOMBRES_NECESARIOS){
-                    message.reply("⚠️ Cupo de hombres lleno. Puedes quedar como reemplazo.");
+                    await safeSendMessage(chat, "⚠️ Cupo de hombres lleno. Puedes quedar como reemplazo.");
                     esperandoSexo[grupoID][personaID] = false;
                     return;
                 }
                 if(sexo === "M" && mujeresActual >= MUJERES_NECESARIOS){
-                    message.reply("⚠️ Cupo de mujeres lleno. Puedes quedar como reemplazo.");
+                    await safeSendMessage(chat, "⚠️ Cupo de mujeres lleno. Puedes quedar como reemplazo.");
                     esperandoSexo[grupoID][personaID] = false;
                     return;
                 }
 
                 sexoPorUsuario[grupoID][personaID] = sexo;
                 confirmadosPorGrupo[grupoID].push(personaID);
-                message.reply(`✅ Confirmación registrada: ${personaNombre} (${sexo === "H" ? "Hombre" : "Mujer"})`);
+                await safeSendMessage(chat, `✅ Confirmación registrada: ${personaNombre} (${sexo === "H" ? "Hombre" : "Mujer"})`);
                 generarExcel(grupoID, chat.name);
                 esperandoSexo[grupoID][personaID] = false;
             } else {
-                message.reply("Por favor responde solo:\n1️⃣ Hombre\n2️⃣ Mujer");
+                await safeSendMessage(chat, "Por favor responde solo:\n1️⃣ Hombre\n2️⃣ Mujer");
             }
             return;
         }
 
         if(PALABRAS_CONFIRMACION.some(p => texto.includes(p))){
-            message.reply("Para completar tu confirmación responde con:\n1️⃣ Hombre\n2️⃣ Mujer");
+            await safeSendMessage(chat, "Para completar tu confirmación responde con:\n1️⃣ Hombre\n2️⃣ Mujer");
             esperandoSexo[grupoID][personaID] = true;
             return;
         }
@@ -160,7 +143,7 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         if(PALABRAS_REEMPLAZO.some(p => texto.includes(p))){
             if(!reemplazosPorGrupo[grupoID].includes(personaID)){
                 reemplazosPorGrupo[grupoID].push(personaID);
-                message.reply("🟡 Reemplazo registrado: " + personaNombre);
+                await safeSendMessage(chat, "🟡 Reemplazo registrado: " + personaNombre);
                 generarExcel(grupoID, chat.name);
             }
         }
@@ -169,57 +152,57 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     });
 
     // ----------------------
-    // FUNCIONES
+    // FUNCIONES AUXILIARES
     // ----------------------
-    function enviarReporte(chat, grupoID){
-        // Protege estructuras
-        miembrosPorGrupo[grupoID] = miembrosPorGrupo[grupoID] || {};
-        confirmadosPorGrupo[grupoID] = confirmadosPorGrupo[grupoID] || [];
-        reemplazosPorGrupo[grupoID] = reemplazosPorGrupo[grupoID] || [];
-        sexoPorUsuario[grupoID] = sexoPorUsuario[grupoID] || {};
+    function faltantes(grupoID){
+        const hombresFaltan = Math.max(0, HOMBRES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="H").length);
+        const mujeresFaltan = Math.max(0, MUJERES_NECESARIOS - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="M").length);
+        return {hombres: hombresFaltan, mujeres: mujeresFaltan};
+    }
 
-        let listaH = "";
-        let listaM = "";
-        let numH = 1, numM = 1;
+    async function enviarReporte(chat, grupoID){
+        let listaConfirmadosH = "";
+        let listaConfirmadosM = "";
 
-        Object.entries(sexoPorUsuario[grupoID]).forEach(([tel,sexo])=>{
-            const nombre = miembrosPorGrupo[grupoID][tel] || "Usuario";
-            if(sexo==="H"){ listaH += `${numH}. ${nombre}\n`; numH++; }
-            if(sexo==="M"){ listaM += `${numM}. ${nombre}\n`; numM++; }
+        Object.entries(sexoPorUsuario[grupoID]).forEach(([tel, sexo], i)=>{
+            const nombre = miembrosPorGrupo[grupoID][tel];
+            if(sexo === "H") listaConfirmadosH += `${listaConfirmadosH.split("\n").length}. ${nombre}\n`;
+            if(sexo === "M") listaConfirmadosM += `${listaConfirmadosM.split("\n").length}. ${nombre}\n`;
         });
+
+        const faltan = faltantes(grupoID);
 
         const texto = `📊 REPORTE
 
+Fecha: ${fecha}
+
 Confirmados: ${confirmadosPorGrupo[grupoID].length}
 Reemplazos: ${reemplazosPorGrupo[grupoID].length}
+Faltantes: Hombres: ${faltan.hombres}, Mujeres: ${faltan.mujeres}
 
 👨 HOMBRES
-${listaH || "Nadie"}
+${listaConfirmadosH || "Nadie aún"}
 
 👩 MUJERES
-${listaM || "Nadie"}
+${listaConfirmadosM || "Nadie aún"}
 `;
-        chat.sendMessage(texto);
+
+        await safeSendMessage(chat, texto);
     }
 
-    async function generarExcel(grupoID, nombreGrupo){
-        miembrosPorGrupo[grupoID] = miembrosPorGrupo[grupoID] || {};
-        confirmadosPorGrupo[grupoID] = confirmadosPorGrupo[grupoID] || [];
-        reemplazosPorGrupo[grupoID] = reemplazosPorGrupo[grupoID] || [];
-        sexoPorUsuario[grupoID] = sexoPorUsuario[grupoID] || {};
-
+    async function generarExcel(grupoID,nombreGrupo){
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet("Asistencia");
         sheet.addRow(["Nombre","Estado","Sexo","Fecha"]);
 
-        confirmadosPorGrupo[grupoID].forEach(tel=>{
-            const nombre = miembrosPorGrupo[grupoID][tel] || "Usuario";
-            const sexo = sexoPorUsuario[grupoID][tel] === "H" ? "Hombre" : "Mujer";
+        confirmadosPorGrupo[grupoID].forEach(telefono=>{
+            const nombre = miembrosPorGrupo[grupoID][telefono];
+            const sexo = sexoPorUsuario[grupoID][telefono] === "H" ? "Hombre" : "Mujer";
             sheet.addRow([nombre,"Confirmado",sexo,fecha]);
         });
 
-        reemplazosPorGrupo[grupoID].forEach(tel=>{
-            const nombre = miembrosPorGrupo[grupoID][tel] || "Desconocido";
+        reemplazosPorGrupo[grupoID].forEach(telefono=>{
+            const nombre = miembrosPorGrupo[grupoID][telefono] || "Desconocido";
             sheet.addRow([nombre,"Reemplazo","-",fecha]);
         });
 
@@ -235,8 +218,7 @@ ${listaM || "Nadie"}
             if(!chat.isGroup) continue;
             if(!GRUPOS_ACTIVOS.includes(chat.name)) continue;
             const grupoID = chat.id._serialized;
-            if(!confirmadosPorGrupo[grupoID]) continue; // 🔒 protección
-            enviarReporte(chat, grupoID);
+            await enviarReporte(chat, grupoID);
         }
     });
 
@@ -246,13 +228,13 @@ ${listaM || "Nadie"}
             if(!chat.isGroup) continue;
             if(!GRUPOS_ACTIVOS.includes(chat.name)) continue;
             const grupoID = chat.id._serialized;
-            if(!confirmadosPorGrupo[grupoID]) continue; // 🔒 protección
+
             if(confirmadosPorGrupo[grupoID].length >= NECESARIOS){
                 let mensaje = "✅ LISTA COMPLETA\n\n";
                 confirmadosPorGrupo[grupoID].forEach((t,i)=>{
                     mensaje += `${i+1}. ${miembrosPorGrupo[grupoID][t]}\n`;
                 });
-                chat.sendMessage(mensaje);
+                await safeSendMessage(chat, mensaje);
                 generarExcel(grupoID,chat.name);
             }
         }
