@@ -114,7 +114,7 @@ ${listaConfirmadosM || "Nadie aún"}
 
     // ---------------------- CONFIG BOT ----------------------
     const client = new Client({
-        authStrategy: new LocalAuth(),
+         authStrategy: new LocalAuth({ clientId: "temp", dataPath: "./temp_auth" }),
         puppeteer: {
             headless: true,
             executablePath: '/usr/bin/chromium-browser',
@@ -123,6 +123,7 @@ ${listaConfirmadosM || "Nadie aún"}
             timeout: 0
         }
     });
+
 
     client.on('qr', qr => qrcode.generate(qr, {small:true}));
 
