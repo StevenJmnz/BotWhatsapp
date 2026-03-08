@@ -7,8 +7,10 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
-    executablePath: '/usr/bin/chromium-browser', // <-- importante
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    executablePath: '/usr/bin/chromium-browser',
+    args: ['--no-sandbox','--disable-setuid-sandbox'],
+    defaultViewport: null,  // más estable
+    timeout: 0               // espera indefinida
   }
 });
 
