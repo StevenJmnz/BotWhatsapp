@@ -5,7 +5,7 @@ const ExcelJS = require('exceljs');
 const readline = require('readline');
 
 // ----------------------
-// ENTRADA DE USUARIO: GRUPOS Y NÚMEROS REQUERIDOS
+// ENTRADA DE USUARIO: GRUPOS ACTIVOS Y NÚMEROS
 // ----------------------
 const rl = readline.createInterface({
     input: process.stdin,
@@ -17,13 +17,13 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     console.log('Grupos activos:', GRUPOS_ACTIVOS.join(', '));
 
     rl.question('Número total de personas necesarias: ', (total) => {
-        const NECESARIOS = parseInt(total);
+        const NECESARIOS = parseInt(total) || 100; // default 100 si no se ingresa
 
-        rl.question('Número de HOMBRES necesarios: ', (hombres) => {
-            const HOMBRES_NECESARIOS = parseInt(hombres);
+        rl.question('Número de hombres necesarios: ', (hombres) => {
+            const HOMBRES_NECESARIOS = parseInt(hombres) || 40; // default 40 si no se ingresa
 
-            rl.question('Número de MUJERES necesarios: ', (mujeres) => {
-                const MUJERES_NECESARIOS = parseInt(mujeres);
+            rl.question('Número de mujeres necesarios: ', (mujeres) => {
+                const MUJERES_NECESARIOS = parseInt(mujeres) || 60; // default 60 si no se ingresa
 
                 rl.close();
 
@@ -144,6 +144,7 @@ ${listaConfirmadosM || "Nadie aún"}
                     }
                 });
 
+                // ---------------------- MENSAJES ----------------------
                 client.on('message', async message=>{
                     try{
                         if(!message.from.includes("@g.us")) return;
@@ -158,7 +159,6 @@ ${listaConfirmadosM || "Nadie aún"}
 
                         miembrosPorGrupo[grupoID][personaID] = personaNombre;
 
-                        // ---------------- SEXO ----------------
                         if(esperandoSexo[grupoID][personaID]){
                             if(texto==="1" || texto==="2"){
                                 const sexo = texto==="1"?"H":"M";
@@ -188,14 +188,12 @@ ${listaConfirmadosM || "Nadie aún"}
                             }
                         }
 
-                        // -------------- CONFIRMACION --------------
                         if(PALABRAS_CONFIRMACION.some(p => texto.includes(p))){
                             await safeSend(chat,"Para completar tu confirmación responde con:\n1️⃣ Hombre\n2️⃣ Mujer");
                             esperandoSexo[grupoID][personaID] = true;
                             return;
                         }
 
-                        // -------------- REEMPLAZO --------------
                         if(PALABRAS_REEMPLAZO.some(p => texto.includes(p))){
                             if(!reemplazosPorGrupo[grupoID].includes(personaID)){
                                 reemplazosPorGrupo[grupoID].push(personaID);
@@ -205,7 +203,6 @@ ${listaConfirmadosM || "Nadie aún"}
                             return;
                         }
 
-                        // -------------- REPORTE --------------
                         if(texto==="reporte") enviarReporte(chat, grupoID);
 
                     } catch(err){ console.log("ERROR MENSAJE:", err.message); }
