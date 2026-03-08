@@ -7,10 +7,10 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
-    executablePath: '/usr/bin/chromium-browser',
+    executablePath: '/usr/bin/chromium-browser', // Chromium del sistema
     args: ['--no-sandbox','--disable-setuid-sandbox'],
-    defaultViewport: null,  // más estable
-    timeout: 0               // espera indefinida
+    defaultViewport: null,
+    timeout: 0 // espera indefinida para que cargue WhatsApp Web
   }
 });
 
