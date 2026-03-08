@@ -9,7 +9,7 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
-// Pedimos los grupos primero
+// ---------------------- ENTRADA DE USUARIO ----------------------
 rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) => {
     const GRUPOS_ACTIVOS = answer.split(',').map(g => g.trim());
     console.log('Grupos activos:', GRUPOS_ACTIVOS.join(', '));
@@ -20,7 +20,7 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
     const MUJERES_POR_GRUPO = {};
 
     function pedirNumerosGrupo() {
-        if(index >= GRUPOS_ACTIVOS.length) {
+        if (index >= GRUPOS_ACTIVOS.length) {
             rl.close();
             iniciarBot();
             return;
@@ -42,6 +42,7 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
 
     pedirNumerosGrupo();
 
+    // ---------------------- INICIAR BOT ----------------------
     function iniciarBot() {
         const client = new Client({
             authStrategy: new LocalAuth(),
@@ -55,7 +56,6 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         });
 
         const fecha = new Date().toISOString().split("T")[0];
-
         const PALABRAS_CONFIRMACION = ["confirmo","Confirmo","confirmó","Confirmó","presente","voy","asistencia","participaré","cuenten conmigo","estoy adentro"];
         const PALABRAS_REEMPLAZO = ["yo voy","me reemplazo","puedo ir"];
 
@@ -65,22 +65,22 @@ rl.question('Ingresa los nombres de los grupos separados por comas: ', (answer) 
         let sexoPorUsuario = {};
         let esperandoSexo = {};
 
-        async function safeSend(chat, text){
+        async function safeSend(chat, text) {
             try { await chat.sendMessage(text); } 
-            catch(err){ console.log("Error enviando mensaje:", err.message); }
+            catch(err) { console.log("Error enviando mensaje:", err.message); }
         }
 
-        function faltantes(grupoID, grupoNombre){
-            const hombresFaltan = Math.max(0, HOMBRES_POR_GRUPO[grupoNombre] - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="H").length);
-            const mujeresFaltan = Math.max(0, MUJERES_POR_GRUPO[grupoNombre] - Object.values(sexoPorUsuario[grupoID]).filter(s => s==="M").length);
+        function faltantes(grupoID, grupoNombre) {
+            const hombresFaltan = Math.max(0, HOMBRES_POR_GRUPO[grupoNombre] - Object.values(sexoPorUsuario[grupoID]).filter(s => s === "H").length);
+            const mujeresFaltan = Math.max(0, MUJERES_POR_GRUPO[grupoNombre] - Object.values(sexoPorUsuario[grupoID]).filter(s => s === "M").length);
             return {hombres: hombresFaltan, mujeres: mujeresFaltan};
         }
 
-        async function enviarReporte(messageOrChat, grupoID, grupoNombre){
+        async function enviarReporte(messageOrChat, grupoID, grupoNombre) {
             let listaConfirmadosH = "";
             let listaConfirmadosM = "";
 
-            Object.entries(sexoPorUsuario[grupoID]).forEach(([tel, sexo])=>{
+            Object.entries(sexoPorUsuario[grupoID]).forEach(([tel, sexo]) => {
                 const nombre = miembrosPorGrupo[grupoID][tel];
                 if(sexo === "H") listaConfirmadosH += `${listaConfirmadosH.split("\n").length}. ${nombre}\n`;
                 if(sexo === "M") listaConfirmadosM += `${listaConfirmadosM.split("\n").length}. ${nombre}\n`;
@@ -224,7 +224,7 @@ ${listaConfirmadosM || "Nadie aún"}
         // ---------------------- CRON JOBS ----------------------
         cron.schedule('0 * * * *', async ()=>{
             for(const grupoID in confirmadosPorGrupo){
-                const grupoNombre = GRUPOS_ACTIVOS.find(g => miembrosPorGrupo[grupoID] && Object.values(miembrosPorGrupo[grupoID]).length>0) || grupoID;
+                const grupoNombre = GRUPOS_ACTIVOS.find(g => g === Object.values(miembrosPorGrupo[grupoID])[0]) || grupoID;
                 const chatObj = {sendMessage: msg => safeSend({id:grupoID}, msg)};
                 await enviarReporte(chatObj, grupoID, grupoNombre);
             }
@@ -232,7 +232,7 @@ ${listaConfirmadosM || "Nadie aún"}
 
         cron.schedule('0 * * * *', async ()=>{
             for(const grupoID in confirmadosPorGrupo){
-                const grupoNombre = GRUPOS_ACTIVOS.find(g => miembrosPorGrupo[grupoID] && Object.values(miembrosPorGrupo[grupoID]).length>0) || grupoID;
+                const grupoNombre = GRUPOS_ACTIVOS.find(g => g === Object.values(miembrosPorGrupo[grupoID])[0]) || grupoID;
                 if(confirmadosPorGrupo[grupoID].length>=NECESARIOS_POR_GRUPO[grupoNombre]){
                     let mensaje = "✅ LISTA COMPLETA\n\n";
                     confirmadosPorGrupo[grupoID].forEach((t,i)=>{ mensaje += `${i+1}. ${miembrosPorGrupo[grupoID][t]}\n`; });
