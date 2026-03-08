@@ -17,7 +17,7 @@ const HOMBRES_NECESARIOS = 40;
 const MUJERES_NECESARIOS = 60;
 const fecha = new Date().toISOString().split("T")[0];
 
-const GRUPOS_ACTIVOS = ["Direct Jobs Turno Noche"];
+const GRUPOS_ACTIVOS = ["FMI 👌"];
 
 const PALABRAS_CONFIRMACION = ["confirmo","Confirmo","confirmó","Confirmó","presente","voy","asistencia","participaré","cuenten conmigo","estoy adentro"];
 const PALABRAS_REEMPLAZO = ["yo voy","me reemplazo","puedo ir"];
