@@ -3,15 +3,7 @@ const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
 const readline = require('readline');
-const fs = require('fs');
 
-// ---------------------- BORRAR SESIÓN PARA FORZAR QR ----------------------
-const authPath = './temp_auth';
-if (fs.existsSync(authPath)) {
-    fs.rmSync(authPath, { recursive: true, force: true });
-}
-
-// ---------------------- LECTURA DINÁMICA ----------------------
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -27,7 +19,7 @@ function pregunta(query) {
     const GRUPOS_ACTIVOS = gruposInput.split(',').map(g => g.trim());
     console.log('Grupos activos:', GRUPOS_ACTIVOS.join(', '));
 
-    // ---------------------- PEDIR NÚMEROS POR GRUPO ----------------------
+    // ---------------------- PEDIR NUMEROS POR GRUPO ----------------------
     const NECESARIOS_POR_GRUPO = {};
     const HOMBRES_POR_GRUPO = {};
     const MUJERES_POR_GRUPO = {};
@@ -122,7 +114,7 @@ ${listaConfirmadosM || "Nadie aún"}
 
     // ---------------------- CONFIG BOT ----------------------
     const client = new Client({
-        authStrategy: new LocalAuth({ clientId: "temp", dataPath: "./temp_auth" }),
+         authStrategy: new LocalAuth({ clientId: "temp", dataPath: "./temp_auth" }),
         puppeteer: {
             headless: true,
             executablePath: '/usr/bin/chromium-browser',
@@ -131,6 +123,7 @@ ${listaConfirmadosM || "Nadie aún"}
             timeout: 0
         }
     });
+
 
     client.on('qr', qr => qrcode.generate(qr, {small:true}));
 
@@ -172,7 +165,6 @@ ${listaConfirmadosM || "Nadie aún"}
 
             miembrosPorGrupo[grupoID][personaID] = personaNombre;
 
-            // ---------------- SEXO ----------------
             if(esperandoSexo[grupoID][personaID]){
                 if(texto==="1" || texto==="2"){
                     const sexo = texto==="1"?"H":"M";
@@ -202,14 +194,12 @@ ${listaConfirmadosM || "Nadie aún"}
                 }
             }
 
-            // -------------- CONFIRMACION --------------
             if(PALABRAS_CONFIRMACION.some(p => texto.includes(p))){
                 await safeSend(chat,"Para completar tu confirmación responde con:\n1️⃣ Hombre\n2️⃣ Mujer");
                 esperandoSexo[grupoID][personaID] = true;
                 return;
             }
 
-            // -------------- REEMPLAZO --------------
             if(PALABRAS_REEMPLAZO.some(p => texto.includes(p))){
                 if(!reemplazosPorGrupo[grupoID].includes(personaID)){
                     reemplazosPorGrupo[grupoID].push(personaID);
@@ -219,7 +209,6 @@ ${listaConfirmadosM || "Nadie aún"}
                 return;
             }
 
-            // -------------- REPORTE --------------
             if(texto==="reporte") enviarReporte(chat, grupoID, grupoNombre);
 
         } catch(err){ console.log("ERROR MENSAJE:", err.message); }
