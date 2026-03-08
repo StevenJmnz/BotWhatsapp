@@ -2,47 +2,63 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Bot WhatsApp Dashboard</title>
+<title>Dashboard Bot WhatsApp</title>
 <style>
-body { font-family: Arial; padding: 20px; background: #f0f0f0; }
-h1 { text-align: center; }
-.group { background: #fff; padding: 10px; margin-bottom: 10px; border-radius: 6px; }
-.group h2 { margin: 0; }
-pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; }
+body { font-family: sans-serif; margin: 20px; background:#f5f5f5; }
+h1 { color:#333; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; background:#fff; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+th { background: #eee; }
 </style>
 </head>
 <body>
-<h1>Bot WhatsApp Dashboard</h1>
-<div id="grupos"></div>
+<h1>Dashboard Bot WhatsApp</h1>
+<div id="content">Cargando estado...</div>
 
 <script>
 async function fetchStatus(){
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    const container = document.getElementById('grupos');
-    container.innerHTML = '';
+    try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        const grupos = data.grupos || {};
+        const confirmados = data.confirmados || {};
+        const reemplazos = data.reemplazos || {};
+        const sexo = data.sexo || {};
 
-    for(const grupoID in data.grupos){
-        const gName = data.grupos[grupoID];
-        const conf = data.confirmados[grupoID] || [];
-        const rep = data.reemplazos[grupoID] || [];
-        const sex = data.sexo[grupoID] || {};
+        let html = '';
 
-        const div = document.createElement('div');
-        div.className = 'group';
-        div.innerHTML = `
-            <h2>${gName}</h2>
-            <strong>Confirmados (${conf.length}):</strong>
-            <pre>${conf.map(t => `${t} (${sex[t]||'-'})`).join('\n')}</pre>
-            <strong>Reemplazos (${rep.length}):</strong>
-            <pre>${rep.join('\n')}</pre>
-        `;
-        container.appendChild(div);
+        for(const grupoID in grupos){
+            html += `<h2>${grupos[grupoID]}</h2>`;
+            
+            html += `<table><tr><th>Teléfono</th><th>Estado</th><th>Sexo</th></tr>`;
+            
+            // Confirmados
+            if(confirmados[grupoID]){
+                confirmados[grupoID].forEach(tel => {
+                    html += `<tr><td>${tel}</td><td>Confirmado</td><td>${sexo[grupoID]?.[tel] === "H" ? "Hombre" : "Mujer"}</td></tr>`;
+                });
+            }
+
+            // Reemplazos
+            if(reemplazos[grupoID]){
+                reemplazos[grupoID].forEach(tel => {
+                    html += `<tr><td>${tel}</td><td>Reemplazo</td><td>-</td></tr>`;
+                });
+            }
+
+            html += `</table>`;
+        }
+
+        document.getElementById('content').innerHTML = html;
+
+    } catch(err){
+        document.getElementById('content').innerText = "Error cargando estado: " + err.message;
     }
 }
 
-setInterval(fetchStatus, 5000);
+// Actualiza cada 10 segundos
 fetchStatus();
+setInterval(fetchStatus, 10000);
 </script>
 </body>
 </html>

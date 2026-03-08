@@ -18,6 +18,7 @@ app.get('/api/status', (req, res) => {
     res.json(global.botState);
 });
 
-app.listen(port, () => {
-    console.log(`Web dashboard disponible en http://localhost:${port}`);
+// Escucha en todas las interfaces para acceso externo
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Web dashboard disponible en http://136.116.81.204:${port}`);
 });
