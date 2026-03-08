@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Bot WhatsApp Dashboard</title>
+<style>
+body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+h1 { text-align: center; }
+.group { background: #fff; padding: 10px; margin-bottom: 10px; border-radius: 6px; }
+.group h2 { margin: 0; }
+pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>Bot WhatsApp Dashboard</h1>
+<div id="grupos"></div>
+
+<script>
+async function fetchStatus(){
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    const container = document.getElementById('grupos');
+    container.innerHTML = '';
+
+    for(const grupoID in data.grupos){
+        const gName = data.grupos[grupoID];
+        const conf = data.confirmados[grupoID] || [];
+        const rep = data.reemplazos[grupoID] || [];
+        const sex = data.sexo[grupoID] || {};
+
+        const div = document.createElement('div');
+        div.className = 'group';
+        div.innerHTML = `
+            <h2>${gName}</h2>
+            <strong>Confirmados (${conf.length}):</strong>
+            <pre>${conf.map(t => `${t} (${sex[t]||'-'})`).join('\n')}</pre>
+            <strong>Reemplazos (${rep.length}):</strong>
+            <pre>${rep.join('\n')}</pre>
+        `;
+        container.appendChild(div);
+    }
+}
+
+setInterval(fetchStatus, 5000);
+fetchStatus();
+</script>
+</body>
+</html>
