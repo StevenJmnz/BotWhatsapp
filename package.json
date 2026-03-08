@@ -1,0 +1,27 @@
+{
+  "name": "botwhats",
+  "version": "1.0.0",
+  "description": "",
+  "main": "bot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StevenJmnz/BotWhatsapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/StevenJmnz/BotWhatsapp/issues"
+  },
+  "homepage": "https://github.com/StevenJmnz/BotWhatsapp#readme",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "node-cron": "^4.2.1",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.6"
+  }
+}
